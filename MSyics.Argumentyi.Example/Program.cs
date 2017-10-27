@@ -7,7 +7,7 @@ namespace MSyics.Argmentyi.Example
     {
         static void Main(string[] args)
         {
-            args = "foo 10 -a -B bar -C 2017/01/01".Split(" ");
+            args = "foo 10 -a -B bar -C 2017/01/01 /AAA /BBB".Split(" ");
 
             var parser = ArgumentParser<Hoge>.Create(setting =>
             {
@@ -15,7 +15,9 @@ namespace MSyics.Argmentyi.Example
                        .Default(x => x.Count, x => int.Parse(x))
                        .Option("-A", x => x.OptionA, () => true)
                        .Option("-B", x => x.OptionB)
-                       .Option("-C", x => x.OptionC, x => DateTime.Parse(x));
+                       .Option("-C", x => x.OptionC, x => DateTime.Parse(x))
+                       .Option("/AAA", x => x.Actions |= Actions.AAA)
+                       .Option("/BBB", x => x.Actions |= Actions.BBB);
             });
             parser.IgnoreCase = true;
             if (!parser.TryParse(args, out var hoge))
@@ -24,18 +26,26 @@ namespace MSyics.Argmentyi.Example
             }
             else
             {
-                Console.WriteLine($"{hoge.Path},{hoge.Count},{hoge.OptionA},{hoge.OptionB},{hoge.OptionC}");
+                Console.WriteLine($"{hoge.Path},{hoge.Count},{hoge.OptionA},{hoge.OptionB},{hoge.OptionC},[{hoge.Actions}]");
             }
-
         }
 
-        public class Hoge
+        class Hoge
         {
             public string Path { get; set; }
             public int Count { get; set; }
             public bool OptionA { get; set; }
             public string OptionB { get; set; }
             public DateTime OptionC { get; set; }
+            public Actions Actions { get; set; }
+        }
+
+        [Flags]
+        enum Actions
+        {
+            AAA = 1,
+            BBB = 2,
+            CCC = 4,
         }
     }
 }

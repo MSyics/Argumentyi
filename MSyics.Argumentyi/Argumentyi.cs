@@ -164,6 +164,11 @@ namespace MSyics.Argumentyi
         /// 指定する値がある引数
         /// </summary>
         OptionWith,
+
+        /// <summary>
+        /// 
+        /// </summary>
+        OtionA,
     }
 
     /// <summary>
@@ -176,16 +181,23 @@ namespace MSyics.Argumentyi
         /// </summary>
         /// <param name="name">オプションの名前を設定します。</param>
         /// <param name="member">値を設定するプロパティを設定します。</param>
-        /// <param name="value">プロパティに設定する値を返すデリゲートを設定します。</param>
-        IArgumentSettingBuilder<T> Option<TValue>(string name, Expression<Func<T, TValue>> property, Func<TValue> value);
+        /// <param name="value">引数の文字列からプロパティに設定する値を返すデリゲートを設定します。</param>
+        IArgumentSettingBuilder<T> Option<TValue>(string name, Expression<Func<T, TValue>> property, Func<string, TValue> value);
+
+        /// <summary>
+        /// オプションの引数設定を構築します。
+        /// </summary>
+        /// <param name="name">オプションの名前を設定します。</param>
+        /// <param name="value">オブジェクトに値を設定するデリゲートを設定します。</param>
+        IArgumentSettingBuilder<T> Option(string name, Action<T> value);
 
         /// <summary>
         /// オプションの引数設定を構築します。
         /// </summary>
         /// <param name="name">オプションの名前を設定します。</param>
         /// <param name="member">値を設定するプロパティを設定します。</param>
-        /// <param name="value">引数の文字列からプロパティに設定する値を返すデリゲートを設定します。</param>
-        IArgumentSettingBuilder<T> Option<TValue>(string name, Expression<Func<T, TValue>> property, Func<string, TValue> value);
+        /// <param name="value">プロパティに設定する値を返すデリゲートを設定します。</param>
+        IArgumentSettingBuilder<T> Option<TValue>(string name, Expression<Func<T, TValue>> property, Func<TValue> value);
 
         /// <summary>
         /// オプションの引数設定を構築します。
@@ -218,6 +230,39 @@ namespace MSyics.Argumentyi
         /// </summary>
         /// <param name="name">オプションの名前を設定します。</param>
         /// <param name="member">値を設定するプロパティを設定します。</param>
+        /// <param name="value">引数の文字列からプロパティに設定する値を返すデリゲートを設定します。</param>
+        public IArgumentSettingBuilder<T> Option<TValue>(string name, Expression<Func<T, TValue>> property, Func<string, TValue> value)
+        {
+            ArgumentSettings.Add(new ArgumentSetting()
+            {
+                Name = name,
+                SetValue = (x, y) => ((PropertyInfo)((MemberExpression)property.Body).Member).SetValue(x, value(y), null),
+                Pattern = ArgumentPattern.OptionWith,
+            });
+            return this;
+        }
+
+        /// <summary>
+        /// オプションの引数設定を構築します。
+        /// </summary>
+        /// <param name="name">オプションの名前を設定します。</param>
+        /// <param name="value">オブジェクトに値を設定するデリゲートを設定します。</param>
+        public IArgumentSettingBuilder<T> Option(string name, Action<T> value)
+        {
+            ArgumentSettings.Add(new ArgumentSetting()
+            {
+                Name = name,
+                SetValue = (x, _) => value((T)x),
+                Pattern = ArgumentPattern.Option,
+            });
+            return this;
+        }
+
+        /// <summary>
+        /// オプションの引数設定を構築します。
+        /// </summary>
+        /// <param name="name">オプションの名前を設定します。</param>
+        /// <param name="member">値を設定するプロパティを設定します。</param>
         /// <param name="value">プロパティに設定する値を返すデリゲートを設定します。</param>
         public IArgumentSettingBuilder<T> Option<TValue>(string name, Expression<Func<T, TValue>> property, Func<TValue> value)
         {
@@ -230,22 +275,6 @@ namespace MSyics.Argumentyi
             return this;
         }
 
-        /// <summary>
-        /// オプションの引数設定を構築します。
-        /// </summary>
-        /// <param name="name">オプションの名前を設定します。</param>
-        /// <param name="member">値を設定するプロパティを設定します。</param>
-        /// <param name="value">引数の文字列からプロパティに設定する値を返すデリゲートを設定します。</param>
-        public IArgumentSettingBuilder<T> Option<TValue>(string name, Expression<Func<T, TValue>> property, Func<string, TValue> value)
-        {
-            ArgumentSettings.Add(new ArgumentSetting()
-            {
-                Name = name,
-                SetValue = (x, y) => ((PropertyInfo)((MemberExpression)property.Body).Member).SetValue(x, value(y), null),
-                Pattern = ArgumentPattern.OptionWith,
-            });
-            return this;
-        }
 
         /// <summary>
         /// オプションの引数設定を構築します。
