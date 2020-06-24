@@ -1,18 +1,19 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFrameworks>netstandard2.0;netcoreapp3.1;</TargetFrameworks>
     <Authors>MSyics</Authors>
     <PackageId>Argumentyi</PackageId>
     <Company>MSyics</Company>
     <Product>Argumentyi</Product>
-    <Description>Argumentyi is argument parser for .NET Standard 2.0</Description>
+    <Description>Argumentyi is argument parser</Description>
     <Copyright>Copyright (c) 2017 MSyics</Copyright>
-    <PackageLicenseUrl>https://github.com/MSyics/Argumentyi/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageLicenseUrl></PackageLicenseUrl>
     <PackageProjectUrl>https://github.com/MSyics/Argumentyi</PackageProjectUrl>
     <RepositoryUrl>https://github.com/MSyics/Argumentyi</RepositoryUrl>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
 </Project>
