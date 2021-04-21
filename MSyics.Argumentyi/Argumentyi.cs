@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Diagnostics;
 
 namespace MSyics.Argumentyi
 {
@@ -35,10 +36,14 @@ namespace MSyics.Argumentyi
         /// <summary>
         /// 引数から指定された型に変換します。
         /// </summary>
-        public T Parse(string[] args)
-        {
-            var obj = Activator.CreateInstance<T>();
+        public T Parse(string[] args) => Parse(args, Activator.CreateInstance<T>());
 
+        /// <summary>
+        /// 引数から指定された型に変換します。
+        /// </summary>
+        public T Parse(string[] args, T init)
+        {
+            var obj = init;
             var defaults = Builder.ArgumentSettings.Where(x => x.Pattern == ArgumentPattern.Default).GetEnumerator();
             var options = Builder.ArgumentSettings.Where(x => x.Pattern != ArgumentPattern.Default && x.Pattern != ArgumentPattern.Others);
             var others = new List<string>();
@@ -74,42 +79,31 @@ namespace MSyics.Argumentyi
                         case ArgumentPattern.Option:
                             option.SetValue(obj, null);
                             break;
+
                         case ArgumentPattern.OptionWith:
                             var value = args.
                                 Skip(i + 1).
-                                TakeWhile(x => !options.Any(y => y.Name == (IgnoreCase ? x.ToUpper() : x))).
+                                TakeWhile(x => !options.Any(y => (IgnoreCase ? y.Name.ToUpper() : y.Name) == (IgnoreCase ? x.ToUpper() : x))).
                                 FirstOrDefault();
-
-                            if (string.IsNullOrEmpty(value))
-                            {
-                                // 値が設定されていない場合は例外を投げる。
-                                throw new ArgumentException(option.Name);
-                            }
-
                             option.SetValue(obj, value);
                             if (!string.IsNullOrWhiteSpace(value))
                             {
                                 ++i;
                             }
                             break;
+
                         case ArgumentPattern.Options:
                             var values = args.
                                 Skip(i + 1).
-                                TakeWhile(x => !options.Any(y => y.Name == (IgnoreCase ? x.ToUpper() : x))).
+                                TakeWhile(x => !options.Any(y => (IgnoreCase ? y.Name.ToUpper() : y.Name) == (IgnoreCase ? x.ToUpper() : x))).
                                 ToArray();
-
-                            if (values.Length == 0)
-                            {
-                                // 値が設定されていない場合は例外を投げる。
-                                throw new ArgumentException(option.Name);
-                            }
-
                             option.SetValues(obj, values);
                             if (values.Length > 0)
                             {
                                 i += values.Length;
                             }
                             break;
+
                         default:
                             break;
                     }
@@ -122,7 +116,7 @@ namespace MSyics.Argumentyi
                 throw new ArgumentException(defaults.Current.Name);
             }
 
-            if(others.Count > 0)
+            if (others.Count > 0)
             {
                 Builder.ArgumentSettings.Where(x => x.Pattern == ArgumentPattern.Others).FirstOrDefault()?.SetValues(obj, others.ToArray());
             }
@@ -140,8 +134,27 @@ namespace MSyics.Argumentyi
                 obj = Parse(args);
                 return true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Debug.WriteLine(ex);
+                obj = default;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 引数から指定された型への変換を試みます。
+        /// </summary>
+        public bool TryParse(string[] args, T init, out T obj)
+        {
+            try
+            {
+                obj = Parse(args, init);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
                 obj = default;
                 return false;
             }
@@ -161,14 +174,14 @@ namespace MSyics.Argumentyi
     /// <summary>
     /// 引数を表します。
     /// </summary>
-    internal sealed class ArgumentSetting
+    internal sealed class ArgumentSetting<T>
     {
         /// <summary>
         /// 名前を取得します。
         /// </summary>
         public string Name { get; internal set; }
-        internal Action<object, string> SetValue { get; set; }
-        internal Action<object, string[]> SetValues { get; set; }
+        internal Action<T, string> SetValue { get; set; }
+        internal Action<T, string[]> SetValues { get; set; }
         internal ArgumentPattern Pattern { get; set; }
     }
 
@@ -240,6 +253,13 @@ namespace MSyics.Argumentyi
         /// オプションの引数設定を構築します。
         /// </summary>
         /// <param name="name">オプションの名前を設定します。</param>
+        /// <param name="value">オブジェクトに値を設定するデリゲートを設定します。</param>
+        IArgumentSettingBuilder<T> Option(string name, Action<T, string> value);
+
+        /// <summary>
+        /// オプションの引数設定を構築します。
+        /// </summary>
+        /// <param name="name">オプションの名前を設定します。</param>
         /// <param name="property">値を設定するプロパティを設定します。</param>
         /// <param name="value">プロパティに設定する値を返すデリゲートを設定します。</param>
         IArgumentSettingBuilder<T> Option<TValue>(string name, Expression<Func<T, TValue>> property, Func<TValue> value);
@@ -267,6 +287,13 @@ namespace MSyics.Argumentyi
         IArgumentSettingBuilder<T> Options(string name, Expression<Func<T, string[]>> property);
 
         /// <summary>
+        /// オプションの引数設定を構築します。
+        /// </summary>
+        /// <param name="name">オプションの名前を設定します。</param>
+        /// <param name="value">オブジェクトに値を設定するデリゲートを設定します。</param>
+        IArgumentSettingBuilder<T> Options(string name, Action<T, string[]> value);
+
+        /// <summary>
         /// 残りの引数設定を構築します。
         /// </summary>
         /// <param name="value">オブジェクトに値を設定するデリゲートを設定します。</param>
@@ -281,16 +308,11 @@ namespace MSyics.Argumentyi
         /// <summary>
         /// 引数設定の一覧を取得します。
         /// </summary>
-        public List<ArgumentSetting> ArgumentSettings { get; } = new List<ArgumentSetting>();
+        public List<ArgumentSetting<T>> ArgumentSettings { get; } = new List<ArgumentSetting<T>>();
 
-        /// <summary>
-        /// 既定の引数設定を構築します。
-        /// </summary>
-        /// <param name="property">値を設定するプロパティを設定します。</param>
-        /// <param name="value">引数の文字列からプロパティに設定する値を返すデリゲートを設定します。</param>
         public IArgumentSettingBuilder<T> Default<TValue>(Expression<Func<T, TValue>> property, Func<string, TValue> value)
         {
-            ArgumentSettings.Add(new ArgumentSetting()
+            ArgumentSettings.Add(new ArgumentSetting<T>()
             {
                 Name = ((MemberExpression)property.Body).Member.Name,
                 SetValue = (x, y) => ((PropertyInfo)((MemberExpression)property.Body).Member).SetValue(x, value(y), null),
@@ -299,24 +321,11 @@ namespace MSyics.Argumentyi
             return this;
         }
 
-        /// <summary>
-        /// 既定の引数設定を構築します。
-        /// </summary>
-        /// <param name="property">値を設定するプロパティを設定します。</param>
-        public IArgumentSettingBuilder<T> Default(Expression<Func<T, String>> property)
-        {
-            return Default(property, x => x);
-        }
+        public IArgumentSettingBuilder<T> Default(Expression<Func<T, string>> property) => Default(property, x => x);
 
-        /// <summary>
-        /// オプションの引数設定を構築します。
-        /// </summary>
-        /// <param name="name">オプションの名前を設定します。</param>
-        /// <param name="property">値を設定するプロパティを設定します。</param>
-        /// <param name="value">引数の文字列からプロパティに設定する値を返すデリゲートを設定します。</param>
         public IArgumentSettingBuilder<T> Option<TValue>(string name, Expression<Func<T, TValue>> property, Func<string, TValue> value)
         {
-            ArgumentSettings.Add(new ArgumentSetting()
+            ArgumentSettings.Add(new ArgumentSetting<T>()
             {
                 Name = name,
                 SetValue = (x, y) => ((PropertyInfo)((MemberExpression)property.Body).Member).SetValue(x, value(y), null),
@@ -325,31 +334,31 @@ namespace MSyics.Argumentyi
             return this;
         }
 
-        /// <summary>
-        /// オプションの引数設定を構築します。
-        /// </summary>
-        /// <param name="name">オプションの名前を設定します。</param>
-        /// <param name="value">オブジェクトに値を設定するデリゲートを設定します。</param>
         public IArgumentSettingBuilder<T> Option(string name, Action<T> value)
         {
-            ArgumentSettings.Add(new ArgumentSetting()
+            ArgumentSettings.Add(new ArgumentSetting<T>()
             {
                 Name = name,
-                SetValue = (x, _) => value((T)x),
+                SetValue = (x, _) => value(x),
                 Pattern = ArgumentPattern.Option,
             });
             return this;
         }
 
-        /// <summary>
-        /// オプションの引数設定を構築します。
-        /// </summary>
-        /// <param name="name">オプションの名前を設定します。</param>
-        /// <param name="property">値を設定するプロパティを設定します。</param>
-        /// <param name="value">プロパティに設定する値を返すデリゲートを設定します。</param>
+        public IArgumentSettingBuilder<T> Option(string name, Action<T, string> value)
+        {
+            ArgumentSettings.Add(new ArgumentSetting<T>()
+            {
+                Name = name,
+                SetValue = (x, y) => value(x, y),
+                Pattern = ArgumentPattern.OptionWith,
+            });
+            return this;
+        }
+
         public IArgumentSettingBuilder<T> Option<TValue>(string name, Expression<Func<T, TValue>> property, Func<TValue> value)
         {
-            ArgumentSettings.Add(new ArgumentSetting()
+            ArgumentSettings.Add(new ArgumentSetting<T>()
             {
                 Name = name,
                 SetValue = (x, y) => ((PropertyInfo)((MemberExpression)property.Body).Member).SetValue(x, value(), null),
@@ -358,26 +367,11 @@ namespace MSyics.Argumentyi
             return this;
         }
 
+        public IArgumentSettingBuilder<T> Option(string name, Expression<Func<T, string>> property) => Option(name, property, x => x);
 
-        /// <summary>
-        /// オプションの引数設定を構築します。
-        /// </summary>
-        /// <param name="name">オプションの名前を設定します。</param>
-        /// <param name="property">値を設定するプロパティを設定します。</param>
-        public IArgumentSettingBuilder<T> Option(string name, Expression<Func<T, string>> property)
-        {
-            return Option(name, property, x => x);
-        }
-
-        /// <summary>
-        /// オプションの引数設定を構築します。
-        /// </summary>
-        /// <param name="name">オプションの名前を設定します。</param>
-        /// <param name="property">値を設定するプロパティを設定します。</param>
-        /// <param name="value">引数の文字列の一覧からプロパティに設定する値を返すデリゲートを設定します。</param>
         public IArgumentSettingBuilder<T> Options<TValue>(string name, Expression<Func<T, TValue>> property, Func<string[], TValue> value)
         {
-            ArgumentSettings.Add(new ArgumentSetting()
+            ArgumentSettings.Add(new ArgumentSetting<T>()
             {
                 Name = name,
                 SetValues = (x, y) => ((PropertyInfo)((MemberExpression)property.Body).Member).SetValue(x, value(y), null),
@@ -386,18 +380,22 @@ namespace MSyics.Argumentyi
             return this;
         }
 
-        /// <summary>
-        /// 残りの引数設定を構築します。
-        /// </summary>
-        /// <param name="property">値を設定するプロパティを設定します。</param>
-        public IArgumentSettingBuilder<T> Options(string name, Expression<Func<T, string[]>> property)
+        public IArgumentSettingBuilder<T> Options(string name, Expression<Func<T, string[]>> property) => Options(name, property, x => x);
+
+        public IArgumentSettingBuilder<T> Options(string name, Action<T, string[]> value)
         {
-            return Options(name, property, x => x);
+            ArgumentSettings.Add(new ArgumentSetting<T>()
+            {
+                Name = name,
+                SetValues = (x, y) => value(x, y),
+                Pattern = ArgumentPattern.Options,
+            });
+            return this;
         }
 
         public void Others(Action<T, string[]> value)
         {
-            ArgumentSettings.Add(new ArgumentSetting()
+            ArgumentSettings.Add(new ArgumentSetting<T>()
             {
                 Name = "",
                 SetValues = (x, y) => value((T)x, y),
